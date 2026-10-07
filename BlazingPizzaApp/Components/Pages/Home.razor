@@ -1,0 +1,150 @@
+﻿@page "/"
+@using BlazingPizzaApp.Data
+@using BlazingPizzaApp.Model
+@using BlazingPizzaApp.Services
+@inject OrderState OrderState
+@using System.Threading
+@inject NavigationManager NavigationManager
+
+<div class="main-content">
+    <div class="main">
+        <h1>Blazing Pizzas</h1>
+        <ul class="pizza-cards">
+            @if (pizzaSpecials != null)
+            {
+                @foreach (var pizzaSpecial in pizzaSpecials)
+                {
+                    <li @onclick="@(() => OrderState.ShowConfigurePizzaDialog(pizzaSpecial))" style="background-image: url('@pizzaSpecial.ImageUrl')">
+                        <div class="pizza-info">
+                            <span class="title">@pizzaSpecial.Name</span>
+                            @pizzaSpecial.Description
+                            <span class="price">@pizzaSpecial.GetFormattedBasePrice()</span>
+                        </div>
+                    </li>
+                }
+            }
+        </ul>
+    </div>
+    @if (OrderState.Order.Pizzas.Any())
+    {
+        <div class="sidebar">
+            <div class="order-contents">
+                <h2>Your order</h2>
+                @foreach (var configuredPizza in OrderState.Order.Pizzas)
+                {
+                    <p class="cart-item">
+                        <span class="title">@(configuredPizza.Size)" @configuredPizza.Special?.Name</span>
+                        <span class="price">£@configuredPizza.GetFormattedTotalPrice()</span>
+                        <button class="delete-item" @onclick="@(() => OrderState.RemoveConfiguredPizza(configuredPizza))">x</button>
+                    </p>
+                }
+            </div>
+            <div class="order-total">
+                Total:
+                <span class="total-price">£@OrderState.Order.GetFormattedTotalPrice()</span>
+                <button class="btn btn-warning" @onclick="ShowConfirmPlaceOrder">
+                    Pay
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (showConfirmPopup)
+{
+    <div class="dialog-container">
+        <div class="dialog confirm-dialog">
+            <div class="dialog-title">
+                <h2>Confirm your order</h2>
+            </div>
+            <div class="dialog-body confirm-body">
+                <p>Are you sure you want to place the order?</p>
+            </div>
+            <div class="dialog-buttons confirm-buttons">
+                <button type="button" class="btn btn-secondary" @onclick="CancelPlaceOrder">No</button>
+                <button type="button" class="btn btn-success" @onclick="ConfirmPlaceOrder">Yes</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showSuccessPopup)
+{
+    <div class="dialog-container">
+        <div class="dialog confirm-dialog">
+            <div class="dialog-title success-title">
+                <div class="success-icon">✅</div>
+                <h2>Order successful!</h2>
+            </div>
+            <div class="dialog-body confirm-body">
+                <p>Thank you! Your order has been received and is being processed.</p>
+                <p class="success-note">
+                    Check your order status on the
+                    <a class="success-link" @onclick="GoToMyOrders">My Orders</a> page.
+                </p>
+            </div>
+            <div class="dialog-buttons confirm-buttons">
+                <button type="button" class="btn btn-success" @onclick="CloseSuccessPopup">OK</button>
+            </div>
+        </div>
+    </div>
+}
+@if (OrderState.ShowingConfigureDialog && OrderState.ConfiguringPizza != null)
+{
+    <ConfigurePizzaDialog Pizza="OrderState.ConfiguringPizza"
+                          OnCancel="OrderState.CancelConfigurePizzaDialog"
+                          OnConfirm="OrderState.ConfirmConfigurePizzaDialog" />
+}
+@code {
+    private List<PizzaSpecial> pizzaSpecials = new();
+    private bool showConfirmPopup = false;
+    private bool showSuccessPopup = false;
+    private CancellationTokenSource? autoRedirectCts;
+    [Inject] private IPizzaSpecials PizzaSpecialsService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        pizzaSpecials = (await PizzaSpecialsService.GetPizzaSpecialsAsync()).ToList();
+    }
+
+    void ShowConfirmPlaceOrder() => showConfirmPopup = true;
+    void CancelPlaceOrder() => showConfirmPopup = false;
+
+    void GoToMyOrders()
+    {
+        showSuccessPopup = false;
+        Nav.NavigateTo("/myorders");
+    }
+
+    async Task ConfirmPlaceOrder()
+    {
+        await OrderState.PlaceOrderAsync();
+        showConfirmPopup = false;
+        showSuccessPopup = true;
+        autoRedirectCts = new CancellationTokenSource();
+        _ = AutoRedirectToMyOrdersAsync(autoRedirectCts.Token);
+    }
+
+    private async Task AutoRedirectToMyOrdersAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(3000, token);
+            showSuccessPopup = false;
+            await InvokeAsync(StateHasChanged);
+            NavigationManager.NavigateTo("myorders");
+        }
+        catch (TaskCanceledException)
+        {
+            // Timer dibatalkan karena tombol OK diklik manual oleh pengguna
+        }
+    }
+
+    void CloseSuccessPopup()
+    {
+        autoRedirectCts?.Cancel();
+        showSuccessPopup = false;
+        NavigationManager.NavigateTo("myorders");
+    }
+}

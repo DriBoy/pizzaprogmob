@@ -1,0 +1,6 @@
+@BlazingPizzaApp.API_HostAddress = http://localhost:5123
+
+GET {{BlazingPizzaApp.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

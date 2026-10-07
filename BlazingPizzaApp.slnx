@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="BlazingPizzaApp.API/BlazingPizzaApp.API.csproj" Id="3640bd41-ac4a-48ef-a935-aeaa41296e13" />
+  <Project Path="BlazingPizzaApp/BlazingPizzaApp.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>
